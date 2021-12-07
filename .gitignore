@@ -1,0 +1,10 @@
+temp-controller/.pio
+temp-sensor/.pio
+temp-controller/.clang_complete
+temp-sensor/.clang_complete
+temp-controller/.gcc-flags.json
+temp-sensor/.gcc-flags.json
+temp-controller/.ccls
+temp-sensor/.ccls
+temp-controller/.ccls-cache
+temp-sensor/.ccls-cache
