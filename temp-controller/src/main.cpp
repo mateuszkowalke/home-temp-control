@@ -4,18 +4,22 @@
 #include <WiFi.h>
 #include <strings.h>
 
-#define LEFT_PIN 22
-#define RIGHT_PIN 23
+#define RIGHT_PIN 22
+#define LEFT_PIN 23
 
 unsigned long duration;
 int direction;
 
-const char *ssid = "ABR";
-const char *password = "1357908642";
+const char *ssid = "thermostat";
+const char *password = "thermostatpass";
 AsyncWebServer server(80);
-IPAddress localIP(192, 168, 1, 117);
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 0, 0);
+IPAddress localIP(192, 168, 4, 117);
+/* IPAddress gateway(192, 168, 1, 1); */
+/* IPAddress subnet(255, 255, 255, 0); */
+IPAddress gateway(192, 168, 4, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress primaryDNS(8, 8, 8, 8);
+IPAddress secondaryDNS(8, 8, 4, 4);
 
 void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info) {
   Serial.println("Connected to AP successfully!");
@@ -47,6 +51,7 @@ void notFound(AsyncWebServerRequest *request) {
 
 AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler(
     "/turn", [](AsyncWebServerRequest *request, JsonVariant &json) {
+      Serial.println("Received request from sensor.");
       JsonObject jsonObj = json.as<JsonObject>();
       const char *directionStr = jsonObj.getMember("direction");
       direction = atoi(directionStr);
@@ -58,8 +63,12 @@ AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler(
 void setup() {
   Serial.begin(115200);
 
-  pinMode(LEFT_PIN, OUTPUT);
   pinMode(RIGHT_PIN, OUTPUT);
+  pinMode(LEFT_PIN, OUTPUT);
+
+  /* if (!WiFi.config(localIP, gateway, subnet, primaryDNS, secondaryDNS)) { */
+  /*   Serial.println("STA Failed to configure"); */
+  /* } */
 
   if (!WiFi.config(localIP, gateway, subnet)) {
     Serial.println("STA Failed to configure");
@@ -73,6 +82,8 @@ void setup() {
   WiFi.onEvent(WiFiStationDisconnected, SYSTEM_EVENT_STA_DISCONNECTED);
   WiFi.begin(ssid, password);
 
+  delay(100);
+
   server.addHandler(handler);
   server.onNotFound(notFound);
   server.begin();
@@ -81,15 +92,15 @@ void setup() {
 void loop() {
   if (duration > millis()) {
     if (direction == 0) {
-      digitalWrite(RIGHT_PIN, LOW);
-      digitalWrite(LEFT_PIN, HIGH);
-    } else {
       digitalWrite(LEFT_PIN, LOW);
       digitalWrite(RIGHT_PIN, HIGH);
+    } else {
+      digitalWrite(RIGHT_PIN, LOW);
+      digitalWrite(LEFT_PIN, HIGH);
     }
   } else {
-    digitalWrite(LEFT_PIN, LOW);
     digitalWrite(RIGHT_PIN, LOW);
+    digitalWrite(LEFT_PIN, LOW);
   }
-  delay(100);
+  delay(10);
 }

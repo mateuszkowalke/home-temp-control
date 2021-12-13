@@ -8,7 +8,7 @@
 #include <math.h>
 
 // state
-float setTemp = 23;
+float setTemp = 21;
 float c, f;
 
 // Create the MCP9808 temperature sensor object
@@ -110,9 +110,9 @@ static void eventHandlerBtnDwn(lv_event_t *e) {
 
 #define TEMP_REQ_INTERVAL 10 * 1000
 #define POST_COM_INTERVAL 60 * 1000
-#define CONTROLLER_URL "http://192.168.1.177:80/turn"
-const char *ssid = "ABR";
-const char *password = "1357908642";
+#define CONTROLLER_URL "http://192.168.4.117:80/turn"
+const char *ssid = "thermostat";
+const char *password = "thermostatpass";
 unsigned long long readingLastTime, postLastTime;
 int direction, duration, delta;
 char httpRequestData[100];
@@ -135,18 +135,29 @@ void WiFiStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
   WiFi.begin(ssid, password);
 }
 
+void WiFiStaConnToAP(WiFiEvent_t event, WiFiEventInfo_t info) {
+  Serial.println("Station connected to AP");
+  WiFi.softAPgetStationNum();
+}
+
 void setup(void) {
   // needed for proper touch sensor readings
   analogReadResolution(10);
 
   Serial.begin(115200);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  WiFi.onEvent(WiFiStationConnected, SYSTEM_EVENT_STA_CONNECTED);
-  WiFi.onEvent(WiFiGotIP, SYSTEM_EVENT_STA_GOT_IP);
-  WiFi.onEvent(WiFiStationDisconnected, SYSTEM_EVENT_STA_DISCONNECTED);
-  WiFi.begin(ssid, password);
+  /* WiFi.mode(WIFI_STA); */
+  /* WiFi.disconnect(); */
+  /* WiFi.onEvent(WiFiStationConnected, SYSTEM_EVENT_STA_CONNECTED); */
+  /* WiFi.onEvent(WiFiGotIP, SYSTEM_EVENT_STA_GOT_IP); */
+  /* WiFi.onEvent(WiFiStationDisconnected, SYSTEM_EVENT_STA_DISCONNECTED); */
+  /* WiFi.begin(ssid, password); */
+
+  WiFi.onEvent(WiFiStaConnToAP, SYSTEM_EVENT_AP_STACONNECTED);
+  WiFi.softAP(ssid, password);
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
 
   // initiate screen
   tft.init();
@@ -258,7 +269,13 @@ void loop() {
   }
   if ((millis() - postLastTime) > POST_COM_INTERVAL) {
     // Check WiFi connection status
-    if (WiFi.status() == WL_CONNECTED) {
+    /* if (WiFi.status() == WL_CONNECTED) { */
+      Serial.println("Sending command to controller:");
+      Serial.print("Direction: ");
+      Serial.println(direction);
+      Serial.print("Duration: ");
+      Serial.println(duration);
+
       WiFiClient client;
       HTTPClient http;
 
@@ -268,7 +285,7 @@ void loop() {
       // Specify content-type header
       http.addHeader("Content-Type", "application/json");
       // Data to send with HTTP POST
-      direction = setTemp > c ? 0 : 1;
+      direction = c > setTemp ? 0 : 1;
       delta = abs(setTemp - c);
       if (delta > 3) {
         duration = 20;
@@ -289,9 +306,9 @@ void loop() {
 
       // Free resources
       http.end();
-    } else {
-      Serial.println("WiFi Disconnected");
-    }
+    /* } else { */
+      /* Serial.println("WiFi Disconnected"); */
+    /* } */
     postLastTime = millis();
   }
 }
