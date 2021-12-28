@@ -3,12 +3,12 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
-#include <XPT2046_Touchscreen.h>
 #include <lvgl.h>
 #include <math.h>
 
 // state
 float setTemp = 22;
+float actTemp;
 float c, f;
 
 // Create the MCP9808 temperature sensor object
@@ -16,8 +16,6 @@ Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 
 #define CS_PIN 17
 #define IRQ_PIN 34
-XPT2046_Touchscreen ts(CS_PIN, IRQ_PIN);
-TS_Point p;
 
 // setup screen and lvgl variables
 #define ORIENTATION 1
@@ -97,12 +95,20 @@ static void eventHandlerBtnUp(lv_event_t *e) {
   if (e->code == LV_EVENT_CLICKED) {
     setTemp += 0.25;
   }
+  lv_label_set_text_fmt(tempLabel,
+                        "Aktualna temp:\n%d.%02d\n\n\nZadana temp:\n%d.%02d\n",
+                        (int)actTemp, (int)(actTemp * 100) % 100, (int)setTemp,
+                        (int)(setTemp * 100) % 100);
 }
 
 static void eventHandlerBtnDwn(lv_event_t *e) {
   if (e->code == LV_EVENT_CLICKED) {
     setTemp -= 0.25;
   }
+  lv_label_set_text_fmt(tempLabel,
+                        "Aktualna temp:\n%d.%02d\n\n\nZadana temp:\n%d.%02d\n",
+                        (int)actTemp, (int)(actTemp * 100) % 100, (int)setTemp,
+                        (int)(setTemp * 100) % 100);
 }
 
 #define TEMP_REQ_INTERVAL 10 * 1000
@@ -210,13 +216,11 @@ void setup(void) {
   while (!Serial)
     ; // waits for serial terminal to be open, necessary in newer arduino
       // boardst.
-  Serial.println("MCP9808 demo");
 
-  if (!tempsensor.begin(0x18)) {
+  while (!tempsensor.begin(0x18)) {
     Serial.println("Couldn't find MCP9808! Check your connections and verify "
                    "the address is correct.");
-    while (1)
-      ;
+    sleep(1);
   }
 
   Serial.println("Found MCP9808!");
@@ -232,7 +236,7 @@ void setup(void) {
 
 void loop() {
   lv_task_handler();
-  delay(100);
+  delay(5);
   if ((millis() - readingLastTime) > TEMP_REQ_INTERVAL) {
 
     Serial.println("wake up MCP9808.... "); // wake up MCP9808 - power
@@ -253,9 +257,14 @@ void loop() {
     Serial.print(f, 4);
     Serial.println("*F.");
 
+    // this helps to avoid sensor not working properly
+    if (c > -80 && c < 100)
+      actTemp = c;
+
     lv_label_set_text_fmt(
         tempLabel, "Aktualna temp:\n%d.%02d\n\n\nZadana temp:\n%d.%02d\n",
-        (int)c, (int)(c * 100) % 100, (int)setTemp, (int)(setTemp * 100) % 100);
+        (int)actTemp, (int)(actTemp * 100) % 100, (int)setTemp,
+        (int)(setTemp * 100) % 100);
 
     Serial.println("Shutdown MCP9808.... ");
     tempsensor.shutdown_wake(1); // shutdown MSP9808 - power consumption ~0.1
@@ -267,44 +276,44 @@ void loop() {
   if ((millis() - postLastTime) > POST_COM_INTERVAL) {
     // Check WiFi connection status
     /* if (WiFi.status() == WL_CONNECTED) { */
-      Serial.println("Sending command to controller:");
-      Serial.print("Direction: ");
-      Serial.println(direction);
-      Serial.print("Duration: ");
-      Serial.println(duration);
+    Serial.println("Sending command to controller:");
+    Serial.print("Direction: ");
+    Serial.println(direction);
+    Serial.print("Duration: ");
+    Serial.println(duration);
 
-      WiFiClient client;
-      HTTPClient http;
+    WiFiClient client;
+    HTTPClient http;
 
-      // Your Domain name with URL path or IP address with path
-      http.begin(client, CONTROLLER_URL);
+    // Your Domain name with URL path or IP address with path
+    http.begin(client, CONTROLLER_URL);
 
-      // Specify content-type header
-      http.addHeader("Content-Type", "application/json");
-      // Data to send with HTTP POST
-      direction = c > setTemp ? 0 : 1;
-      delta = abs(setTemp - c);
-      if (delta > 3) {
-        duration = 20;
-      } else if (delta > 2) {
-        duration = 15;
-      } else if (delta > 1) {
-        duration = 10;
-      } else {
-        duration = 5;
-      }
-      sprintf(httpRequestData, "{\"direction\":\"%d\",\"duration\":\"%d\"}",
-              direction, duration);
-      // Send HTTP POST request
-      int httpResponseCode = http.POST(httpRequestData);
+    // Specify content-type header
+    http.addHeader("Content-Type", "application/json");
+    // Data to send with HTTP POST
+    direction = actTemp > setTemp ? 0 : 1;
+    delta = abs(setTemp - actTemp);
+    if (delta > 3) {
+      duration = 20;
+    } else if (delta > 2) {
+      duration = 15;
+    } else if (delta > 1) {
+      duration = 10;
+    } else {
+      duration = 5;
+    }
+    sprintf(httpRequestData, "{\"direction\":\"%d\",\"duration\":\"%d\"}",
+            direction, duration);
+    // Send HTTP POST request
+    int httpResponseCode = http.POST(httpRequestData);
 
-      Serial.print("HTTP Response code: ");
-      Serial.println(httpResponseCode);
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
 
-      // Free resources
-      http.end();
+    // Free resources
+    http.end();
     /* } else { */
-      /* Serial.println("WiFi Disconnected"); */
+    /* Serial.println("WiFi Disconnected"); */
     /* } */
     postLastTime = millis();
   }
