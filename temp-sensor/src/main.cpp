@@ -8,16 +8,16 @@
 #include <math.h>
 
 // state
-float setTemp = 21;
+float setTemp = 22;
 float c, f;
 
 // Create the MCP9808 temperature sensor object
 Adafruit_MCP9808 tempsensor = Adafruit_MCP9808();
 
-/* #define CS_PIN 17 */
-/* #define IRQ_PIN 34 */
-/* XPT2046_Touchscreen ts(CS_PIN, IRQ_PIN); */
-/* TS_Point p; */
+#define CS_PIN 17
+#define IRQ_PIN 34
+XPT2046_Touchscreen ts(CS_PIN, IRQ_PIN);
+TS_Point p;
 
 // setup screen and lvgl variables
 #define ORIENTATION 1
@@ -72,15 +72,12 @@ void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
 
   if (millis() > lastTouchTime + DEBOUNCE && tft.getTouch(&x, &y)) {
     // Valid, change
-    /* p = ts.getPoint(); */
     Serial.print("x: ");
     Serial.println(x);
     Serial.print("y: ");
     Serial.println(y);
-    /* Serial.print("z: "); */
-    /* Serial.println(p.z); */
-    data->point.y = map(x, TS_LEFT, TS_RT, 0, tft.height());
-    data->point.x = map(y, TS_BOT, TS_TOP, 0, tft.width());
+    data->point.x = x;
+    data->point.y = y;
     data->state = LV_INDEV_STATE_PR;
     lastTouchTime = millis();
     // ? use to check x and y vales after mapping
@@ -236,7 +233,6 @@ void setup(void) {
 void loop() {
   lv_task_handler();
   delay(100);
-  // Send an HTTP request every 10 minutes
   if ((millis() - readingLastTime) > TEMP_REQ_INTERVAL) {
 
     Serial.println("wake up MCP9808.... "); // wake up MCP9808 - power
@@ -267,6 +263,7 @@ void loop() {
 
     readingLastTime = millis();
   }
+  // Send an HTTP request every 10 minutes
   if ((millis() - postLastTime) > POST_COM_INTERVAL) {
     // Check WiFi connection status
     /* if (WiFi.status() == WL_CONNECTED) { */
